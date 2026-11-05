@@ -38,13 +38,16 @@ def _dates(df, col):
 
 # --------------------------------------------------------------------------- requests
 def requests_clean(spark, cfg):
-    """All staged requests, one row per request_id.
+    return clean_requests(_stg(spark, cfg, "requests"))
+
+
+def clean_requests(r):
+    """Staged requests -> one row per request_id.
 
     Truncated JSON lines (in _corrupt_record) still carry request_id, placement_id and created_at
     at the start of the line; these are recovered by regex and flagged is_truncated_record.
     Duplicate request_ids keep the first arrival.
     """
-    r = _stg(spark, cfg, "requests")
     raw = F.col(CORRUPT)
 
     def salvage(field):
@@ -179,7 +182,12 @@ def affected_impression_dates(spark, cfg, load_date):
 
 
 def clicks_by_fid(spark, cfg):
-    c = _stg(spark, cfg, "clicks").withColumn("ts", utc_ts(F.col("created_at")))
+    return aggregate_clicks(_stg(spark, cfg, "clicks"))
+
+
+def aggregate_clicks(clicks):
+    """One row per fid: a slot is clicked or not; repeated clicks only raise click_count."""
+    c = clicks.withColumn("ts", utc_ts(F.col("created_at")))
     return c.groupBy("fid").agg(
         F.count("*").alias("click_count"),
         F.countDistinct("click_id").alias("click_id_count"),
@@ -188,8 +196,13 @@ def clicks_by_fid(spark, cfg):
 
 
 def postbacks_dedup(spark, cfg, upto=None):
-    """One row per postback_id: 50 ids were delivered twice (identical, next day's folder)."""
-    p = _upto(_stg(spark, cfg, "postbacks"), upto).withColumn("postback_ts", utc_ts(F.col("created_at")))
+    return dedup_postbacks(_upto(_stg(spark, cfg, "postbacks"), upto))
+
+
+def dedup_postbacks(postbacks):
+    """One row per postback_id, the first delivery: 50 ids were delivered twice (identical, next
+    day's folder). Revenue is then counted once."""
+    p = postbacks.withColumn("postback_ts", utc_ts(F.col("created_at")))
     w = Window.partitionBy("postback_id").orderBy("load_date")
     return (
         p.withColumn("_rn", F.row_number().over(w))
@@ -199,25 +212,28 @@ def postbacks_dedup(spark, cfg, upto=None):
     )
 
 
+def first_render_per_fid(impressions):
+    """Several rows per fid = re-renders of the same slot. Keep the first render (earliest
+    created_at, then impression_id so ties are deterministic) and count the rest."""
+    imp = impressions.withColumn("ts", utc_ts(F.col("created_at")))
+    w = Window.partitionBy("fid").orderBy("ts", "impression_id")
+    by_fid = Window.partitionBy("fid")
+    return (
+        imp.withColumn("_rn", F.row_number().over(w))
+        .withColumn("render_count", F.count("*").over(by_fid))
+        .withColumn("last_render_ts", F.max("ts").over(by_fid))
+        .withColumn("first_load_date", F.min("load_date").over(by_fid))
+        .where("_rn = 1").drop("_rn")
+    )
+
+
 def build_fact_impression(spark, cfg, load_date):
     dates = affected_impression_dates(spark, cfg, load_date)
     if not dates:
         return dates
     idx = fid_index(spark, cfg).where(F.col("impression_date").isin(dates))
 
-    imp = (
-        valid_impressions(spark, cfg).join(idx.select("fid"), "fid", "left_semi")
-        .withColumn("ts", utc_ts(F.col("created_at")))
-    )
-    # several rows per fid = re-renders of the same slot; keep the first render, count the rest
-    w = Window.partitionBy("fid").orderBy("ts", "impression_id")
-    first = (
-        imp.withColumn("_rn", F.row_number().over(w))
-        .withColumn("render_count", F.count("*").over(Window.partitionBy("fid")))
-        .withColumn("last_render_ts", F.max("ts").over(Window.partitionBy("fid")))
-        .withColumn("first_load_date", F.min("load_date").over(Window.partitionBy("fid")))
-        .where("_rn = 1")
-    )
+    first = first_render_per_fid(valid_impressions(spark, cfg).join(idx.select("fid"), "fid", "left_semi"))
     req_id, position = decode_fid(F.col("fid"))
     f = first.select(
         "fid",

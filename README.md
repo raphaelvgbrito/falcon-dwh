@@ -157,6 +157,9 @@ Publisher 003's rev share changed 60 → 70 on 2026-09-27; this is the only dime
 `python -m pytest` (runs on the configured Spark, writes to schema `falcon_test`):
 - `test_transforms.py`: fid decoding (real value, url alphabet, missing padding, garbage → null), `t`/`f`,
   order JSON spellings.
+- `test_dedup.py`: re-renders collapse to the first render per fid (ties deterministic, render counts add up to
+  the input rows), postbacks delivered twice count once (revenue too), repeated clicks make one clicked slot,
+  duplicate requests keep the first arrival and truncated request lines are recovered.
 - `test_dims.py`: SCD2 (change, missing folder, deleted id), snapshot de-duplication, `dim_time`, time key.
 - `test_ml.py`: user agent parsing (12 real shapes), FX fill-forward never uses a later rate, USD conversion,
   holidays, history features use only previous days.
