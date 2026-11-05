@@ -33,6 +33,8 @@ external:
   fx_base: USD
   fx_lookback_days: 10        # fetch from first_date - N so the first days have a previous rate
   http_timeout_s: 30
+  # raw API response saved by code on every successful fetch; used when the API is unreachable
+  fx_cache_path: reference/frankfurter_fx_response.json
   refresh: false              # true = fetch again even if the reference tables already cover the range
   # Public holidays come from the `holidays` Python package (no network), into ref_holidays.
 

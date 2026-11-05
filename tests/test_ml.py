@@ -95,3 +95,31 @@ def test_history_uses_only_previous_days(spark, daily):
     assert first.publisher_impressions_7d == 0 and first.publisher_cvr_7d is None  # no history yet
     after = feats[D("2026-09-11")]
     assert after.publisher_cvr_7d == pytest.approx((6 + 100) / 70)  # the burst is usable the next day
+
+
+def test_fx_uses_saved_response_when_api_is_unreachable(tmp_path):
+    import requests
+
+    from falcon_dwh.config import load_config
+    from falcon_dwh.external import get_fx_response, save_fx_response
+
+    cfg = load_config()
+    cache = tmp_path / "fx.json"
+    cfg["external"]["fx_cache_path"] = str(cache)
+    body = {"base": "USD", "rates": {"2026-08-24": {"EUR": 0.86}}}
+
+    def down(*_args):
+        raise requests.ConnectionError("no route to host")
+
+    with pytest.raises(requests.ConnectionError):  # no saved response: fail loudly, no silent nulls
+        get_fx_response(cfg, fetch=down)
+
+    from falcon_dwh.external import fx_range
+
+    start, end = fx_range(cfg)
+    save_fx_response(cache, cfg["external"]["fx_url"], "USD", start, end, body)
+    got, source = get_fx_response(cfg, fetch=down)
+    assert got == body and "saved response" in source
+
+    live, source = get_fx_response(cfg, fetch=lambda *_a: {"base": "USD", "rates": {}})
+    assert live == {"base": "USD", "rates": {}} and source == cfg["external"]["fx_url"]
