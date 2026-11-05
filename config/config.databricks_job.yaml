@@ -1,0 +1,30 @@
+# Config for running INSIDE Databricks (job / notebook): the active Spark session is used.
+# Only the paths and names below are environment-specific.
+
+spark:
+  mode: cluster
+  session_conf:
+    spark.sql.session.timeZone: UTC
+
+input:
+  base_path: /Volumes/workspace/falcon/raw/dataset
+
+warehouse:
+  catalog: workspace
+  schema: falcon
+  format: delta   # Delta only (see config.yaml)
+
+output:
+  # the job's repo checkout is temporary, so reports go to a volume
+  reports_dir: /Volumes/workspace/falcon/raw/reports
+
+external:
+  fx_url: https://api.frankfurter.dev/v1   # needs outbound internet once; then ref_fx_rates is reused
+  fx_base: USD
+  fx_lookback_days: 10
+  http_timeout_s: 30
+  refresh: false
+
+run:
+  first_date: "2026-08-24"
+  last_date: "2026-10-25"

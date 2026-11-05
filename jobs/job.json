@@ -1,0 +1,38 @@
+{
+  "name": "falcon-dwh daily run",
+  "max_concurrent_runs": 1,
+  "git_source": {
+    "git_url": "https://github.com/raphaelvgbrito/falcon-dwh",
+    "git_provider": "gitHub",
+    "git_branch": "main"
+  },
+  "parameters": [
+    {"name": "date", "default": "2026-08-24"},
+    {"name": "schema", "default": "falcon"}
+  ],
+  "tasks": [
+    {
+      "task_key": "run_day",
+      "spark_python_task": {
+        "python_file": "jobs/run_job.py",
+        "source": "GIT",
+        "parameters": [
+          "run",
+          "--config", "config/config.databricks_job.yaml",
+          "--schema", "{{job.parameters.schema}}",
+          "--date", "{{job.parameters.date}}"
+        ]
+      },
+      "environment_key": "default"
+    }
+  ],
+  "environments": [
+    {
+      "environment_key": "default",
+      "spec": {
+        "client": "2",
+        "dependencies": ["pyyaml==6.0.2", "requests==2.32.3", "holidays==0.62"]
+      }
+    }
+  ]
+}

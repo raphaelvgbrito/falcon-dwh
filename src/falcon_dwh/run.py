@@ -56,6 +56,7 @@ def run_day(spark, cfg, load_date, layers=LAYERS):
 def main(argv=None):
     p = argparse.ArgumentParser()
     p.add_argument("--config")
+    p.add_argument("--schema", help="override warehouse.schema (e.g. a trial schema)")
     p.add_argument("--date", help="process a single day (YYYY-MM-DD)")
     p.add_argument("--start")
     p.add_argument("--end")
@@ -67,7 +68,7 @@ def main(argv=None):
     for noisy in ("py4j", "databricks", "urllib3"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.schema)
     spark = get_spark(cfg)
     if args.date:
         days = [args.date]

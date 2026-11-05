@@ -15,12 +15,12 @@ from pathlib import Path
 from pyspark.sql import functions as F
 
 from falcon_dwh.checks import fingerprint
-from falcon_dwh.config import load_config, table_name
+from falcon_dwh.config import load_config, repo_path, table_name
 from falcon_dwh.run import run_day
 from falcon_dwh.schemas import SOURCES
 from falcon_dwh.spark_session import get_spark
 
-REPORTS = Path(__file__).resolve().parents[2] / "reports"
+REPORTS = Path("reports")  # set from output.reports_dir in main()
 
 # table -> numeric columns whose sums are part of the proof
 OUTPUTS = {
@@ -129,12 +129,15 @@ def main(argv=None):
     p.add_argument("what", choices=["counts", "rerun", "dq"])
     p.add_argument("--date")
     p.add_argument("--config")
+    p.add_argument("--schema")
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     for noisy in ("py4j", "databricks", "urllib3"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
-    REPORTS.mkdir(exist_ok=True)
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.schema)
+    global REPORTS
+    REPORTS = repo_path(cfg.get("output", {}).get("reports_dir", "reports"))
+    REPORTS.mkdir(parents=True, exist_ok=True)
     spark = get_spark(cfg)
     if args.what == "counts":
         write_counts(spark, cfg)

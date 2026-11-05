@@ -18,7 +18,14 @@ input:
 warehouse:
   catalog: workspace
   schema: falcon
+  # Delta only: partition replacement (replaceWhere) and saveAsTable need Delta Lake + a catalog.
+  # On plain Spark (EMR / Dataproc) add delta-spark and a metastore; Parquet is not supported.
   format: delta
+
+output:
+  # Where `python -m falcon_dwh.report` writes markdown / csv. Relative = inside the repo.
+  # In a Databricks job use a volume, e.g. /Volumes/<catalog>/<schema>/<volume>/reports
+  reports_dir: reports
 
 external:
   # Exchange rates (ECB via frankfurter, no key needed). Fetched once by code into ref_fx_rates.
