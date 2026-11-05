@@ -32,9 +32,39 @@ python -m pytest                                                 # tests (write 
 The whole hand-in run (empty schema → all days → reports) is `bash scripts/full_run.sh .venv/Scripts/python`;
 its outputs are in `logs/full_run.log` and `reports/`.
 
-Another config file: `--config path` or `FALCON_CONFIG=path`. On a cluster without `databricks-connect`,
-install `pyyaml requests holidays` and the package; PySpark comes with the cluster.
-The FX rates need internet once (frankfurter); after that they are read from `ref_fx_rates`.
+Another config file: `--config path` or `FALCON_CONFIG=path`.
+
+### Running on your cluster
+
+What was actually run, and how:
+
+| Way | Status |
+|---|---|
+| Laptop → Databricks via `databricks-connect` (`config/config.yaml`) | used for development, the tests and the full run in `logs/` |
+| **Databricks job** on serverless, code checked out from this GitHub repo (`jobs/job.json`, `config/config.databricks_job.yaml`, `spark.mode: cluster`) | ran one day end to end (all layers) on Databricks Free Edition: run `469415988902347`, 216 s, SUCCESS |
+| Plain Spark (EMR, Dataproc, local) | **not tested**; needs Delta Lake (`delta-spark`) and a metastore, see below |
+
+As a Databricks job:
+1. Upload the dataset to a volume (or any path the cluster reads); set `input.base_path`,
+   `warehouse.catalog`, `warehouse.schema` and `output.reports_dir` in `config/config.databricks_job.yaml`.
+2. Create the job: `databricks jobs create --json @jobs/job.json` (edit `git_url` if you fork). It runs
+   `jobs/run_job.py run --config config/config.databricks_job.yaml --schema {{schema}} --date {{date}}` with
+   `pyyaml`, `requests`, `holidays` installed by the job environment.
+3. One day: `databricks jobs run-now --json '{"job_id": <id>, "job_parameters": {"date": "2026-08-24"}}'`.
+   A scheduler passes the date; a backfill passes `--start/--end` instead of `--date`.
+4. Reports: `jobs/run_job.py report --config config/config.databricks_job.yaml counts|dq|rerun --date ...`
+   write to `output.reports_dir` (a volume, because the job's checkout is temporary).
+
+No internet on the cluster? Databricks Free Edition serverless has none. Exchange rates are fetched from
+frankfurter by code; every successful fetch also saves the raw API response (with URL and fetch time) to
+`reference/frankfurter_fx_response.json`, and a run that cannot reach the API uses that saved response
+with a warning (`ref_fx_rates.source` says which). Holidays come from the `holidays` package (offline).
+To refresh the saved response: `python -m falcon_dwh.external`.
+
+Plain Spark: start Spark with Delta (`--packages io.delta:delta-spark_2.12:3.2.0` plus the two Delta
+`spark.sql.extensions` / `spark.sql.catalog.spark_catalog` settings), set `spark.mode: cluster`,
+`warehouse.catalog: spark_catalog`, and run `spark-submit jobs/run_job.py run --config ... --date ...`.
+Parquet is not supported: the idempotent partition replacement relies on Delta's `replaceWhere`.
 
 ## What it builds
 
@@ -52,7 +82,7 @@ The FX rates need internet once (frankfurter); after that they are read from `re
 | mart | `ml_training` | shown slot (`fid`) | `fid` | `impression_date` |
 | reference | `ref_fx_rates` | (calendar day, currency) | `rate_date, currency` | – |
 | reference | `ref_holidays` | (country, holiday date) | `country_code, holiday_date` | – |
-| quality | `dq_report` | (run day, check, table) | `load_date, check, table_name` | `load_date` |
+| quality | `dq_report` | (run day, check, table): rows in vs manifest, rows in → out per table, and every problem check | `load_date, check, table_name` | `load_date` |
 | quality | `recon_impressions` | run day | `load_date` | `load_date` |
 
 Facts join dimensions on id + event date between `valid_from` and `valid_to` (the key of the version is
@@ -162,7 +192,8 @@ Publisher 003's rev share changed 60 → 70 on 2026-09-27; this is the only dime
   duplicate requests keep the first arrival and truncated request lines are recovered.
 - `test_dims.py`: SCD2 (change, missing folder, deleted id), snapshot de-duplication, `dim_time`, time key.
 - `test_ml.py`: user agent parsing (12 real shapes), FX fill-forward never uses a later rate, USD conversion,
-  holidays, history features use only previous days.
+  FX falls back to the saved API response (and fails loudly without one), holidays, history features use
+  only previous days.
 - `test_staging.py`: explicit schema, re-run idempotent, only its own partition, missing folder.
 - `test_incremental.py`: from empty tables, run 08-24..08-26: a postback arriving 08-26 flips the 08-24
   impression to converted; re-running 08-26 and then 08-24 leaves all tables identical.
@@ -176,10 +207,13 @@ time key test (a client-side time zone shift).
 
 ## Known gaps / not done
 
-- Holidays use the UTC date and the shopper's IP country; 14 countries are not in the package.
+- Holidays use the UTC date and the shopper's IP country. `ref_holidays` covers every country the `holidays`
+  package supports (155 with holidays in 2026); requests from other countries are counted in the DQ check
+  `country_without_holiday_calendar` and get `is_public_holiday = false`.
 - iPadOS Safari reports itself as a Mac, so those iPads are counted as desktop.
 - A conversion counts with or without a click on the slot (every postback in the data has one anyway); no
   attribution window is applied. To confirm with the team.
-- No orchestration (Databricks Job / Airflow) is included; `run.py --date` is the job entry point.
+- Orchestration is a single Databricks job definition (`jobs/job.json`, one task per day); no Airflow DAG,
+  retries/alerts or schedule are configured. A daily trigger would pass yesterday's date.
 - Tests run against Spark through the configured connection (Databricks), not a local SparkSession: the
   Windows laptop could not run local Spark without unofficial Hadoop binaries.
