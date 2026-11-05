@@ -1,0 +1,18 @@
+[project]
+name = "falcon-dwh"
+version = "0.1.0"
+requires-python = ">=3.10"
+# pyspark is provided by the cluster; for local runs install requirements-dev.txt
+# (databricks-connect ships its own pyspark, do not install both).
+dependencies = ["pyyaml>=6", "requests>=2.31", "holidays>=0.60"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

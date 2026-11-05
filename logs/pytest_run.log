@@ -1,0 +1,32 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.3.4, pluggy-1.7.0 -- C:\Users\rapha\Downloads\test_homework\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\rapha\Downloads\test_homework\falcon-dwh
+configfile: pyproject.toml
+testpaths: tests
+collecting ... collected 22 items
+
+tests/test_dims.py::test_unchanged_rows_collapse_and_change_opens_new_version PASSED [  4%]
+tests/test_dims.py::test_missing_folder_does_not_split_a_version PASSED  [  9%]
+tests/test_dims.py::test_id_missing_from_a_snapshot_closes_its_version PASSED [ 13%]
+tests/test_dims.py::test_dedup_snapshot_keeps_latest_updated_row PASSED  [ 18%]
+tests/test_dims.py::test_dim_time_has_every_minute_once PASSED           [ 22%]
+tests/test_dims.py::test_time_key_matches_dim_time PASSED                [ 27%]
+tests/test_incremental.py::test_late_postback_updates_earlier_impression_and_rerun_is_stable PASSED [ 31%]
+tests/test_ml.py::test_parse_user_agent PASSED                           [ 36%]
+tests/test_ml.py::test_fx_fill_forward_never_uses_a_later_rate PASSED    [ 40%]
+tests/test_ml.py::test_usd_conversion PASSED                             [ 45%]
+tests/test_ml.py::test_holidays_from_package PASSED                      [ 50%]
+tests/test_ml.py::test_history_uses_only_previous_days PASSED            [ 54%]
+tests/test_staging.py::test_staged_columns_are_the_explicit_schema PASSED [ 59%]
+tests/test_staging.py::test_rerunning_a_day_does_not_change_staging PASSED [ 63%]
+tests/test_staging.py::test_rerun_only_replaces_its_own_partition PASSED [ 68%]
+tests/test_staging.py::test_missing_day_folder_is_reported_not_failed PASSED [ 72%]
+tests/test_staging.py::test_campaign_weight_decimal_is_not_corrupt PASSED [ 77%]
+tests/test_transforms.py::test_decode_fid_real_value PASSED              [ 81%]
+tests/test_transforms.py::test_decode_fid_without_padding_and_url_alphabet PASSED [ 86%]
+tests/test_transforms.py::test_decode_fid_bad_values_are_null_not_errors PASSED [ 90%]
+tests/test_transforms.py::test_tf_bool PASSED                            [ 95%]
+tests/test_transforms.py::test_parse_request_data_handles_key_spellings PASSED [100%]
+
+======================= 22 passed in 655.65s (0:10:55) ========================
