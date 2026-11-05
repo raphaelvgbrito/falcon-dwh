@@ -1,6 +1,7 @@
 """Data quality report and impression reconciliation, per run day.
 
 dq_report             grain: one row per (load_date, check, table)    partition: load_date
+    includes rows in (staged vs manifest) and rows in -> after dedup -> out (warehouse) per table
     check, table_name, total_rows, failed_rows, example (one failing row as JSON), action
 recon_impressions     grain: one row per load_date                    partition: load_date
     stg_rows = fact_rows + collapsed_rerenders + rejected_rows, and fact_rows found in the fact
@@ -16,7 +17,15 @@ from pyspark.sql import Window
 from pyspark.sql import functions as F
 
 from falcon_dwh.config import table_name
-from falcon_dwh.facts import _upto, fid_index, impression_reject_reason, postbacks_dedup, valid_impressions
+from falcon_dwh.facts import (
+    _upto,
+    clean_requests,
+    dedup_postbacks,
+    fid_index,
+    impression_reject_reason,
+    postbacks_dedup,
+    valid_impressions,
+)
 from falcon_dwh.io import overwrite_partitions
 from falcon_dwh.schemas import CORRUPT, SOURCES
 
@@ -83,10 +92,51 @@ def row_count_checks(spark, cfg, load_date, day):
     )
 
 
+def _count(df):
+    return df.agg(F.count("*").alias("n"))
+
+
+def rows_in_out_checks(spark, cfg, load_date, day):
+    """Rows in (staged from folder D) -> after de-duplication -> rows out (warehouse rows that first
+    arrived in folder D). failed_rows = rows that the de-duplication does not explain (must be 0).
+    Impressions have their own split in recon_impressions (fact + collapsed re-renders + rejected)."""
+    T = lambda n: spark.table(table_name(cfg, n))  # noqa: E731
+    at_d = F.col("first_load_date") == day
+
+    def row(table, n_in, n_kept, n_out, action):
+        j = n_in.select(F.col("n").alias("n_in")).crossJoin(n_kept.select(F.col("n").alias("n_kept"))).crossJoin(
+            n_out.select(F.col("n").alias("n_out")))
+        return j.select(
+            F.lit("rows_in_out").alias("check"), F.lit(table).alias("table_name"),
+            F.col("n_in").alias("total_rows"),
+            F.abs(F.col("n_kept") - F.col("n_out")).alias("failed_rows"),
+            F.format_string("in=%d after_dedup=%d out=%d removed_as_duplicates=%d",
+                            "n_in", "n_kept", "n_out", F.col("n_in") - F.col("n_kept")).alias("example"),
+            F.lit(action).alias("action"),
+        )
+
+    req_in = _count(_stg_day(spark, cfg, "requests", day))
+    req_kept = _count(clean_requests(_upto(T("stg_requests"), load_date)).where(F.col("load_date") == day))
+    req_out = _count(T("fact_request").where(at_d))
+    pb_in = _count(_stg_day(spark, cfg, "postbacks", day))
+    pb_kept = _count(dedup_postbacks(_upto(T("stg_postbacks"), load_date)).where(at_d))
+    pb_out = _count(T("fact_postback").where(at_d))
+    imp_out = T("fact_impression").where(at_d).select("fid")
+    ml_out = _count(T("ml_training").join(imp_out, "fid", "left_semi"))
+    return (
+        row("fact_request", req_in, req_kept, req_out,
+            "requests already delivered in an earlier folder are dropped (first arrival kept)")
+        .unionByName(row("fact_postback", pb_in, pb_kept, pb_out,
+                         "postbacks already delivered in an earlier folder are dropped (revenue counted once)"))
+        .unionByName(row("ml_training", _count(imp_out), _count(imp_out), ml_out,
+                         "one ML row per fact_impression row (same grain); see recon_impressions for impressions"))
+    )
+
+
 def build_dq_report(spark, cfg, load_date):
     day = F.lit(load_date).cast("date")
     stg = {n: _stg_day(spark, cfg, n, day) for n in SOURCES}
-    out = [row_count_checks(spark, cfg, load_date, day)]
+    out = [row_count_checks(spark, cfg, load_date, day), rows_in_out_checks(spark, cfg, load_date, day)]
 
     # corrupt (unparseable) rows
     for name, df in stg.items():
@@ -188,6 +238,12 @@ def build_dq_report(spark, cfg, load_date):
     out.append(_check(frc, F.col("order_amount").isNotNull() & F.col("order_currency").isNotNull() & F.col("_has_rate").isNull(),
                       "currency_without_fx_rate", "fact_request",
                       "order_amount_usd = null in the ML mart (ECB/frankfurter has no rate for it)", exr))
+    hol_cc = spark.table(table_name(cfg, "ref_holidays")).select(F.col("country_code").alias("country")).distinct()
+    frh = fr.join(hol_cc.withColumn("_has_cal", F.lit(True)), "country", "left")
+    out.append(_check(frh, F.col("country").isNotNull() & F.col("_has_cal").isNull(),
+                      "country_without_holiday_calendar", "fact_request",
+                      "is_public_holiday = false in the ML mart (country not in the holidays package)",
+                      ["request_id", "country"]))
 
     report = out[0]
     for df in out[1:]:

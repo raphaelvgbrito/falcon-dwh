@@ -134,18 +134,21 @@ def holiday_rows(country_codes, years):
 
 
 def load_holidays(spark, cfg):
-    name = "ref_holidays"
-    if table_exists(spark, cfg, name) and not cfg["external"].get("refresh"):
-        return
+    """Holidays of every country the package supports, rebuilt on every run.
+
+    Not "the countries seen so far": on a first run that would be only day 1's countries, and a
+    country appearing later would silently get no holidays. The full list is data-independent,
+    small (~2k rows a year) and offline, so rebuilding it each run is cheap and always identical.
+    """
+    import holidays
+
     run = cfg["run"]
     years = sorted({int(run["first_date"][:4]), int(run["last_date"][:4])})
-    # ~200 distinct country codes: a tiny result, safe to bring to the driver
-    codes = [r[0] for r in spark.table(table_name(cfg, "stg_requests")).select("country").distinct().collect()]
-    rows, unsupported = holiday_rows(codes, years)
-    log.info("holidays: %d rows, %d countries not supported by the package: %s",
-             len(rows), len(unsupported), ",".join(unsupported))
+    rows, _ = holiday_rows(holidays.list_supported_countries(), years)
+    log.info("holidays: %d rows for %d countries (holidays %s)", len(rows), len({r[0] for r in rows}),
+             holidays.__version__)
     df = spark.createDataFrame(rows, "country_code string, holiday_date date, holiday_name string")
-    overwrite_table(df, cfg, name)
+    overwrite_table(df, cfg, "ref_holidays")
 
 
 def load_reference_data(spark, cfg):
