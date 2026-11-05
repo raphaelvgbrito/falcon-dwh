@@ -6,10 +6,14 @@
 The package lives in src/; the job runs this file from the repo checkout, so src/ is put on the
 path here instead of installing a wheel.
 """
+import inspect
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+# Databricks serverless runs this file with exec(compile(source, path)), so __file__ is not set;
+# the code object still knows its path. Plain python / spark-submit set __file__ as usual.
+_this_file = globals().get("__file__") or inspect.currentframe().f_code.co_filename
+ROOT = Path(_this_file).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from falcon_dwh import report, run  # noqa: E402
