@@ -11,7 +11,7 @@ Everything runs as Delta tables in one schema (default `workspace.falcon`), part
 This is how the pipeline was developed, tested and fully run. The Python code runs on the laptop; the Spark
 work runs on the Databricks workspace through `databricks-connect` (serverless compute).
 
-**You need:** Python **3.12** (required by  16.4), git, the [Databricks CLI](https://docs.databricks.com/dev-tools/cli/install.html),
+**You need:** Python **3.12** (required by `databricks-connect` 16.4), git, the [Databricks CLI](https://docs.databricks.com/dev-tools/cli/install.html),
 a Databricks workspace with serverless compute and Unity Catalog, and permission to create a schema and a
 volume in one catalog.
 
