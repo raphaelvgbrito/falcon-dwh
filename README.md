@@ -6,33 +6,69 @@ folder can change, and writes an ML training table and a data quality report.
 
 Everything runs as Delta tables in one schema (default `workspace.falcon`), partitioned by date.
 
-## How to run
+## How to run (from a laptop, against a Databricks workspace)
 
-Requirements: Python 3.10+, a Spark/Databricks environment, and the dataset uploaded somewhere Spark can read.
+This is how the pipeline was developed, tested and fully run. The Python code runs on the laptop; the Spark
+work runs on the Databricks workspace through `databricks-connect` (serverless compute).
 
-1. Upload the dataset folder (the one with `manifest.json` and the `dt=...` folders) and set
-   `input.base_path` in [`config/config.yaml`](config/config.yaml). Set `warehouse.catalog` / `warehouse.schema`.
-2. Choose how Spark is reached (`spark.mode`):
-   - `databricks_connect`: from a laptop (this is how it was developed and run). Auth comes from the
-     Databricks CLI profile in `~/.databrickscfg` (`databricks auth login --host <workspace-url>`); no token is
-     stored in the repo.
-   - `cluster`: inside a Databricks job / notebook or any Spark cluster; the active session is used.
-3. Install and run:
+**You need:** Python **3.12** (required by  16.4), git, the [Databricks CLI](https://docs.databricks.com/dev-tools/cli/install.html),
+a Databricks workspace with serverless compute and Unity Catalog, and permission to create a schema and a
+volume in one catalog.
+
+**1. Log in to the workspace** (once; the login is stored in `~/.databrickscfg` on your machine, never in the repo)
 
 ```bash
-python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt && .venv/Scripts/pip install -e .
-python -m falcon_dwh.run --date 2026-08-24                      # one day (what the scheduler calls)
-python -m falcon_dwh.run --start 2026-08-24 --end 2026-10-25     # backfill, day by day in order
+databricks auth login --host https://<your-workspace>.cloud.databricks.com
+```
+
+**2. Upload the dataset** (the folder that contains `manifest.json` and the `dt=...` folders)
+
+```bash
+databricks schemas create falcon <catalog>
+databricks volumes create <catalog> falcon raw MANAGED
+databricks fs cp -r <local>/dataset dbfs:/Volumes/<catalog>/falcon/raw/dataset
+```
+
+**3. Install**
+
+```bash
+git clone https://github.com/raphaelvgbrito/falcon-dwh.git && cd falcon-dwh
+python -m venv .venv
+source .venv/bin/activate            # Windows (Git Bash): source .venv/Scripts/activate
+pip install -r requirements-dev.txt
+pip install -e .
+```
+
+**4. Point the config at your workspace** – edit [`config/config.yaml`](config/config.yaml), nothing else:
+- `input.base_path`: `/Volumes/<catalog>/falcon/raw/dataset`
+- `warehouse.catalog` / `warehouse.schema`: where the tables are written (e.g. `<catalog>` / `falcon`)
+- `spark.databricks_profile`: the CLI profile name if not `DEFAULT`; to use a cluster instead of serverless,
+  set `serverless: false` and `cluster_id`.
+
+**5. Run**
+
+```bash
+bash scripts/full_run.sh python      # the hand-in run: see warning below
+```
+
+`full_run.sh` **drops every table in `warehouse.schema`**, runs all days in order (2026-08-24 → 2026-10-25,
+~1.5 min per day, ~1.5 h in total), then writes `reports/row_counts.md`, `reports/rerun_proof_2026-09-15.md`,
+`reports/dq_summary.md` and `reports/dq_report_by_day.csv`. The log goes to `logs/full_run.log`.
+
+Single steps:
+
+```bash
+python -m falcon_dwh.run --date 2026-08-24                      # one day (what a scheduler calls)
+python -m falcon_dwh.run --start 2026-08-24 --end 2026-09-30     # several days, in order
 python -m falcon_dwh.report rerun --date 2026-09-15              # re-run proof -> reports/
 python -m falcon_dwh.report counts                               # row counts -> reports/
 python -m falcon_dwh.report dq                                   # DQ summary + reconciliation -> reports/
-python -m pytest                                                 # tests (write to schema falcon_test)
+python -m pytest                                                 # tests, ~11 min (see below)
 ```
 
-The whole hand-in run (empty schema → all days → reports) is `bash scripts/full_run.sh .venv/Scripts/python`;
-its outputs are in `logs/full_run.log` and `reports/`.
-
-Another config file: `--config path` or `FALCON_CONFIG=path`.
+The tests use the same connection but their own schema, `<catalog>.falcon_test` (created if missing, and
+emptied by the integration test), so they never touch the warehouse schema. Another config file:
+`--config path` or `FALCON_CONFIG=path`.
 
 ### Running on your cluster
 
