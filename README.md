@@ -241,6 +241,11 @@ the way: `_corrupt_record` counts (the `1.00` weight), SCD2 overlap check (the d
 fingerprint that must differ between two different days (so the re-run test cannot pass trivially), and the
 time key test (a client-side time zone shift).
 
+Fresh-clone check (commit `7e4879a`): cloned from GitHub into an empty folder, installed exactly as in
+"How to run" (Python 3.12, new venv), then ran all 27 tests (pass), 3 days into a new schema `falcon_clone`, and
+a re-run proof of 08-25 there (all tables identical). The first attempt failed because `run` did not create a
+schema that did not exist yet; fixed in that commit.
+
 ## Known gaps / not done
 
 - Holidays use the UTC date and the shopper's IP country. `ref_holidays` covers every country the `holidays`
