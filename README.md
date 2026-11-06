@@ -252,8 +252,6 @@ schema that did not exist yet; fixed in that commit.
   package supports (155 with holidays in 2026); requests from other countries are counted in the DQ check
   `country_without_holiday_calendar` and get `is_public_holiday = false`.
 - iPadOS Safari reports itself as a Mac, so those iPads are counted as desktop.
-- A conversion counts with or without a click on the slot (every postback in the data has one anyway); no
-  attribution window is applied. To confirm with the team.
 - Orchestration is a single Databricks job definition (`jobs/job.json`, one task per day); no Airflow DAG,
   retries/alerts or schedule are configured. A daily trigger would pass yesterday's date.
 - Tests run against Spark through the configured connection (Databricks), not a local SparkSession: the
