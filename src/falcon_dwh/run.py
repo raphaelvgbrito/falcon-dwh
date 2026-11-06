@@ -70,6 +70,8 @@ def main(argv=None):
 
     cfg = load_config(args.config, args.schema)
     spark = get_spark(cfg)
+    wh = cfg["warehouse"]
+    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {wh['catalog']}.{wh['schema']}")  # first run into a new schema
     if args.date:
         days = [args.date]
     else:
