@@ -75,15 +75,16 @@ def write_rerun_proof(spark, cfg, day):
         b, a = before[t], after.get(t, {})
         same = b == a
         all_equal &= same
-        sums = "; ".join(f"{k[4:]}={b[k]}" for k in b if k.startswith("sum_"))
-        rows.append((t, f"{b['rows']:,}", f"{a.get('rows', 0):,}", b["checksum"], a.get("checksum"), sums or "-",
-                     "yes" if same else "**NO**"))
+        sums_b = "; ".join(f"{k[4:]}={b[k]}" for k in b if k.startswith("sum_"))
+        sums_a = "; ".join(f"{k[4:]}={a.get(k)}" for k in b if k.startswith("sum_"))
+        rows.append((t, f"{b['rows']:,}", f"{a.get('rows', 0):,}", b["checksum"], a.get("checksum"),
+                     sums_b or "-", sums_a or "-", "yes" if same else "**NO**"))
     text = (
         f"# Re-run proof\n\nRe-ran the whole pipeline for **{day}** (all layers) on top of the fully loaded "
         f"warehouse, and compared every table before and after.\n`checksum` = sum of xxhash64 over all "
-        f"columns of every row (order independent); sums are the money / count columns.\n\n"
+        f"columns of every row (order independent); sums are the money / count columns, summed as decimals so they are exact.\n\n"
         + _md_table(["table", "rows before", "rows after", "checksum before", "checksum after",
-                     "sums (before)", "identical"], rows)
+                     "sums before", "sums after", "identical"], rows)
         + f"\n\n**All tables identical: {'yes' if all_equal else 'NO'}**\n"
     )
     (REPORTS / f"rerun_proof_{day}.md").write_text(text, encoding="utf-8")

@@ -1,0 +1,37 @@
+# Re-run proof
+
+Re-ran the whole pipeline for **2026-09-15** (all layers) on top of the fully loaded warehouse, and compared every table before and after.
+`checksum` = sum of xxhash64 over all columns of every row (order independent); sums are the money / count columns, summed as decimals so they are exact.
+
+| table | rows before | rows after | checksum before | checksum after | sums before | sums after | identical |
+|---|---|---|---|---|---|---|---|
+| stg_requests | 1,939,685 | 1,939,685 | -6284207214544266569501 | -6284207214544266569501 | - | - | yes |
+| stg_impressions | 2,552,611 | 2,552,611 | 8980765549255074287898 | 8980765549255074287898 | - | - | yes |
+| stg_clicks | 240,103 | 240,103 | -3079404461172044958706 | -3079404461172044958706 | - | - | yes |
+| stg_postbacks | 6,226 | 6,226 | 517866761175404783503 | 517866761175404783503 | revenue=252704.250000 | revenue=252704.250000 | yes |
+| stg_orders | 992,663 | 992,663 | 2253376917724488215014 | 2253376917724488215014 | amount=813561544.070000 | amount=813561544.070000 | yes |
+| stg_placement | 107,430 | 107,430 | 908807529596734976718 | 908807529596734976718 | - | - | yes |
+| stg_site | 105,236 | 105,236 | 287408514443623931021 | 287408514443623931021 | - | - | yes |
+| stg_publisher | 2,001 | 2,001 | 47739531692247502550 | 47739531692247502550 | - | - | yes |
+| stg_platform | 1,116 | 1,116 | -130324356351135364591 | -130324356351135364591 | - | - | yes |
+| stg_category | 7,130 | 7,130 | -108397388031160730362 | -108397388031160730362 | - | - | yes |
+| stg_advertiser | 11,315 | 11,315 | -405940537318759807735 | -405940537318759807735 | - | - | yes |
+| stg_campaign | 20,373 | 20,373 | 72277982884404140288 | 72277982884404140288 | - | - | yes |
+| stg_banner | 71,587 | 71,587 | -917176861770068105570 | -917176861770068105570 | - | - | yes |
+| stg_site_enrichment | 92,457 | 92,457 | 2103649567832816596565 | 2103649567832816596565 | - | - | yes |
+| stg_campaign_enrichment | 18,739 | 18,739 | -520587139904148742842 | -520587139904148742842 | - | - | yes |
+| dim_placement | 3,449 | 3,449 | -179966440773498923181 | -179966440773498923181 | - | - | yes |
+| dim_banner | 1,344 | 1,344 | 206230864193047433159 | 206230864193047433159 | - | - | yes |
+| dim_date | 63 | 63 | 48491030431171277736 | 48491030431171277736 | - | - | yes |
+| dim_time | 1,440 | 1,440 | -297953919669385766516 | -297953919669385766516 | - | - | yes |
+| fact_request | 1,939,685 | 1,939,685 | -19423059477630985285282 | -19423059477630985285282 | order_amount=1308197976.910000 | order_amount=1308197976.910000 | yes |
+| fact_impression | 2,123,218 | 2,123,218 | -9172449548706382350224 | -9172449548706382350224 | render_count=2552611.000000; click_count=239234.000000; conversion_count=6117.000000; revenue_usd=247751.410000 | render_count=2552611.000000; click_count=239234.000000; conversion_count=6117.000000; revenue_usd=247751.410000 | yes |
+| fact_postback | 6,176 | 6,176 | -208049444150000698639 | -208049444150000698639 | revenue=248376.850000 | revenue=248376.850000 | yes |
+| rejected_impressions | 0 | 0 | 0 | 0 | - | - | yes |
+| ml_training | 2,123,218 | 2,123,218 | 7406953322838337685654 | 7406953322838337685654 | order_amount_usd=1225166745.140000 | order_amount_usd=1225166745.140000 | yes |
+| ref_fx_rates | 2,190 | 2,190 | -255874840986133104716 | -255874840986133104716 | units_per_usd=1470377.170760 | units_per_usd=1470377.170760 | yes |
+| ref_holidays | 2,133 | 2,133 | -199430106403768365208 | -199430106403768365208 | - | - | yes |
+| dq_report | 5,292 | 5,292 | 193864363067928585031 | 193864363067928585031 | failed_rows=1394629.000000 | failed_rows=1394629.000000 | yes |
+| recon_impressions | 63 | 63 | 23478282260405642123 | 23478282260405642123 | stg_rows=2552611.000000; fact_rows=2123218.000000; collapsed_rerenders=429393.000000; rejected_rows=0.000000 | stg_rows=2552611.000000; fact_rows=2123218.000000; collapsed_rerenders=429393.000000; rejected_rows=0.000000 | yes |
+
+**All tables identical: yes**

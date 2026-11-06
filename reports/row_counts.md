@@ -1,0 +1,34 @@
+# Row counts after the full run
+
+Generated 2026-11-06 01:11 UTC from `workspace.falcon`.
+
+| table | rows |
+|---|---|
+| stg_requests | 1,939,685 |
+| stg_impressions | 2,552,611 |
+| stg_clicks | 240,103 |
+| stg_postbacks | 6,226 |
+| stg_orders | 992,663 |
+| stg_placement | 107,430 |
+| stg_site | 105,236 |
+| stg_publisher | 2,001 |
+| stg_platform | 1,116 |
+| stg_category | 7,130 |
+| stg_advertiser | 11,315 |
+| stg_campaign | 20,373 |
+| stg_banner | 71,587 |
+| stg_site_enrichment | 92,457 |
+| stg_campaign_enrichment | 18,739 |
+| dim_placement | 3,449 |
+| dim_banner | 1,344 |
+| dim_date | 63 |
+| dim_time | 1,440 |
+| fact_request | 1,939,685 |
+| fact_impression | 2,123,218 |
+| fact_postback | 6,176 |
+| rejected_impressions | 0 |
+| ml_training | 2,123,218 |
+| ref_fx_rates | 2,190 |
+| ref_holidays | 2,133 |
+| dq_report | 5,292 |
+| recon_impressions | 63 |

@@ -1,0 +1,23 @@
+# Data quality summary (all days)
+
+Full per-day report: `dq_report_by_day.csv` (and table `dq_report`).
+
+| check | table | failed rows | days | action | example |
+|---|---|---|---|---|---|
+| rerender_collapsed | impressions | 429,393 | 62 | one fact row per fid (first render), render_count kept | `{"fid":"M2E0MWY0MjAzZmQ4YmE1YTow","impression_id":"25860fbfa7b0dfbf","created_at":"2026-09-06 22:33:56.604"}` |
+| null_amount | orders | 306,182 | 62 | kept; downstream flag (e.g. placement_found=false, no USD amount) | `{"order_id":"00003a85be9d29c4","site_id":"04a0b5b13c9aa179","placement_id":"a03105b8b0abc021","customer_id":"8401208474e7cf1c","created_at":"2026-09-25 22:13:33` |
+| null_currency | orders | 277,711 | 62 | kept; downstream flag (e.g. placement_found=false, no USD amount) | `{"order_id":"00003a85be9d29c4","site_id":"04a0b5b13c9aa179","placement_id":"a03105b8b0abc021","customer_id":"8401208474e7cf1c","created_at":"2026-09-25 22:13:33` |
+| click_flood | clicks | 153,794 | 52 | kept; is_click counts once per slot; slot has > 100 clicks in total, review for fraud | `{"fid":"MmY0N2UxOTJlZWQ5YWMwNTow","_fid_clicks":"1002"}` |
+| preview_traffic | fact_request | 74,639 | 29 | kept, flagged has_preview / is_preview in the ML mart so training can filter it | `{"request_id":"0001e72efeaf57c3","placement_id":"dcd4cd9e36f3e6ac"}` |
+| late_arrival | impressions | 36,169 | 3 | dated by created_at; earlier fact partitions rebuilt | `{"impression_id":"0000c8c450fb9ad5","fid":"MzVkNzQyZmFjNjJhMDZlNDo0","placement_id":"b18bf18cdf04cce9","banner_id":"6780b09922349f92","created_at":"2026-10-03 0` |
+| order_amount_without_currency | fact_request | 35,077 | 62 | no USD amount possible | `{"request_id":"00020e58fa88d3f5","placement_id":"f7e80e970636a990","order_amount_raw":"68.63"}` |
+| late_arrival | requests | 24,041 | 1 | dated by created_at; earlier fact partitions rebuilt | `{"request_id":"000933362eff2ee2","placement_id":"f7e80e970636a990","created_at":"2026-10-03 13:18:32.347","session_id":"5837367f98afdd2d","user_agent":"Mozilla/` |
+| no_dimension_match_banner | fact_impression | 24,029 | 62 | kept with banner_found=false | `{"fid":"M2E0MmQ1MmQ0YTlmNjA0MDow","request_id":"3a42d52d4a9f6040","placement_id":"f7e80e970636a990","banner_id":"10991be7724082be","impression_date":"2026-10-01` |
+| late_arrival | orders | 14,067 | 1 | dated by created_at; earlier fact partitions rebuilt | `{"order_id":"00028ea0618f4257","site_id":"86acfa877e2fd318","placement_id":"3d2c6824fe8d1a8a","created_at":"2026-10-03 13:23:44","amount":"408.58","currency":"E` |
+| placement_differs_from_request | fact_impression | 7,487 | 29 | kept; impression placement used for the placement dimension | `{"fid":"M2E1ZDFhMDI1YzgwMzFkYjow","request_id":"3a5d1a025c8031db","placement_id":"d3e49cdc6c0d3bc6","banner_id":"147f39cbdd24be72","impression_date":"2026-10-23` |
+| no_dimension_match_placement | fact_request | 2,324 | 62 | kept with placement_found=false | `{"request_id":"00055b4e4807272d","placement_id":"c4c784225e3225a7"}` |
+| country_without_holiday_calendar | fact_request | 1,973 | 62 | is_public_holiday = false in the ML mart (country not in the holidays package) | `{"request_id":"000a0e7a85e9eefe","country":"QA"}` |
+| null_placement_id | requests | 1,959 | 62 | kept; downstream flag (e.g. placement_found=false, no USD amount) | `{"_corrupt_record":"{\"request_id\":\"00489fa1a25147bd\",\"placement_id\":\"2f520d2d838c2bda\",\"created_at\":\"2026-09-04T05:13:18.475Z\",\"customer_id\":\"d64` |
+| late_arrival | clicks | 1,664 | 1 | dated by created_at; earlier fact partitions rebuilt | `{"click_id":"00204bf297f398a9","fid":"MWI5MzUyMzBlMTkzNTdjYTow","created_at":"2026-10-03 15:18:34.151","status":"updated","load_date":"2026-10-04","_source_file` |
+| orphan_no_impression | clicks | 869 | 62 | kept in staging only; cannot be attributed to a slot | `{"click_id":"0064d0c5d934fde1","fid":"NGM5ZDExNTA5NGI4YTAxNzox","created_at":"2026-09-10 03:43:00.545"}` |
+| currency_withou

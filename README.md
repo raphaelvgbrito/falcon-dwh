@@ -1,7 +1,7 @@
 # Falcon ad network: a small data warehouse in PySpark
 
 A daily batch pipeline over the 62 delivered day folders (2026-08-24 to 2026-10-25, `dt=2026-10-03`
-was not delivered). It loads each folder into a staging layer, rebuilds the parts of the warehouse that the
+was not delivered; its events came in the 10-04 folder). It loads each folder into a staging layer, rebuilds the parts of the warehouse that the
 folder can change, and writes an ML training table and a data quality report.
 
 Everything runs as Delta tables in one schema (default `workspace.falcon`), partitioned by date.
@@ -174,9 +174,9 @@ Full list with counts and examples per day: `reports/dq_summary.md`, `reports/dq
 
 | Problem | Size | Decision |
 |---|---|---|
-| Folder `dt=2026-10-03` missing (spec says 63 days, manifest has 62) | 1 day | logged; `dim_date.source_folder_loaded=false`; SCD2 versions span the gap |
+| Folder `dt=2026-10-03` missing (spec says 63 days, manifest has 62); its events arrive in the `dt=2026-10-04` folder | 24k requests, 31k impressions, 14k orders, 1.7k clicks, 54 postbacks | dated by `created_at`, so the 10-03 fact partitions are filled; `dim_date.source_folder_loaded=false`; no 10-03 dimension snapshot, so SCD2 versions span the gap |
 | 20 request lines truncated mid-JSON (2026-09-25) | 20 rows | kept in `_corrupt_record`; id / placement / time recovered by regex, `is_truncated_record` |
-| ~1.2% of events in the next day's folder | 24k requests, 36k impressions, 1.7k clicks, 105 postbacks | dated by `created_at`, earlier partitions rebuilt |
+| Other events in a later day's folder | 4.7k impressions (09-17, 09-18), 50 postbacks spread over 30 days | dated by `created_at`, earlier partitions rebuilt |
 | Re-renders: several impression rows per slot, up to 11 days apart | 429k rows | one fact row per fid (first render), `render_count` |
 | Postbacks delivered twice (same id, next day) | 50 | de-duplicated by `postback_id`; revenue counted once |
 | One slot with 147,291 clicks over 51 days (~61% of all clicks) | 1 fid | kept; `is_click` counts once per slot; `click_flood` check |
@@ -184,9 +184,9 @@ Full list with counts and examples per day: `reports/dq_summary.md`, `reports/dq
 | Placement `3d2c6824fe8d1a8a` twice in every snapshot from 09-12 (template 15 vs 99) | 1 id x 43 days | keep the row with the latest `updated_at` |
 | 3 banner ids never in any banner snapshot (+ null banner ids) | ~24k slots (1.1%) | kept, `banner_found=false` |
 | 2 placement ids never in any placement snapshot | 465 slots | kept, `placement_found=false` |
-| Impression placement differs from the request placement (`d3e49cdc…` vs `367a285a…`) | ~74k impressions | kept; impression placement used for the dimension; flag + check |
-| Postbacks whose fid matches no impression | ~50 | kept in `fact_postback` with `impression_found=false` (revenue not lost) |
-| Order amount missing / currency missing; currencies without an ECB rate (SAR, AED, QAR, ...) | ~30% / ~28% / few hundred | `order_amount_usd = null`, never guessed; checks |
+| Impression placement differs from the request placement (`d3e49cdc…` vs `367a285a…`) | 8,077 slots (0.4%) | kept; impression placement used for the dimension; flag + check |
+| Postbacks whose fid matches no impression | 59 | kept in `fact_postback` with `impression_found=false` (revenue not lost) |
+| Order amount missing / currency missing; currencies without an ECB rate (SAR, AED, QAR, ...) | ~31% / ~28% of orders / ~760 requests | `order_amount_usd = null`, never guessed; checks |
 | `weight` written as `1.00` in campaign / banner | 1 row each per day | typed as double, not int |
 | `orderid` / `orderId` (/ `orderID`, `order_value` documented but never seen) | – | coalesced |
 

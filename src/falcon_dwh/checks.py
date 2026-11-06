@@ -12,5 +12,6 @@ def fingerprint(df, sum_cols=()):
         F.count("*").alias("rows"),
         F.coalesce(F.sum(F.xxhash64(*df.columns).cast("decimal(38,0)")), F.lit(0)).alias("checksum"),
     ]
-    aggs += [F.round(F.sum(c), 6).alias(f"sum_{c}") for c in sum_cols]
+    # decimal sums are exact; a sum of doubles depends on the order Spark adds rows
+    aggs += [F.sum(F.col(c).cast("decimal(38,6)")).alias(f"sum_{c}") for c in sum_cols]
     return df.agg(*aggs).first().asDict()
